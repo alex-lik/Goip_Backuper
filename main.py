@@ -28,6 +28,22 @@ def send_backup_to_telegram(file_path, tg_data):
 
 
 @logger.catch
+def send_error_to_telegram(goip_data, tg_data):
+    """Отправляет уведомление в Telegram при ошибке создания бэкапа"""
+    if not tg_data.get('CHAT_ID') or not tg_data.get('TOKEN'):
+        logger.warning(f'Невозможно отправить уведомление об ошибке. Не указаны данные для Telegram: {tg_data}')
+        return
+    message = f"Ошибка при создании бэкапа для {goip_data['name']} ({goip_data['host']})"
+    url = f"https://api.telegram.org/bot{tg_data['TOKEN']}/sendMessage"
+    response = requests.post(url, data={"chat_id": tg_data['CHAT_ID'], "text": message})
+
+    if response.status_code == 200:
+        logger.info(f"Уведомление об ошибке для {goip_data['name']} успешно отправлено в Telegram.")
+    else:
+        logger.warning(f"Ошибка при отправке уведомления об ошибке в Telegram: {response.text}")
+
+
+@logger.catch
 def create_backup(goip_data):
     """Создаёт резервную копию конфигурации GoIP и сохраняет её локально"""
     backup_url = f"http://{goip_data['host']}/default/en_US/config.dat"
@@ -117,6 +133,8 @@ def main():
         file_path = create_backup(goip_data)
         if file_path:
             send_backup_to_telegram(file_path, tg_data)
+        else:
+            send_error_to_telegram(goip_data, tg_data)
     
     # Удаление старых бэкапов
     delete_old_backups()
